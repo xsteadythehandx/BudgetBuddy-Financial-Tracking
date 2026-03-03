@@ -1483,9 +1483,9 @@ function clearAllData() {
 let _csvRows = [], _csvHeaders = [], _pendingImport = [];
 
 function setupPDFWorker() {
-  // Disable web worker — runs in main thread instead, works in ALL browsers
-  // and environments (Chrome, Firefox, Safari, Edge, local file://, GitHub Pages)
-  if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
 }
 
 function openImportModal() {
@@ -1520,7 +1520,7 @@ async function processPDFFile(file) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = `data:application/javascript,`;
   try {
     const buf = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf), useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true }).promise;
+    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
     let fullText = '';
     for (let p = 1; p <= pdf.numPages; p++) {
       el('imp-loading-sub').textContent = `Reading page ${p} of ${pdf.numPages}...`;
