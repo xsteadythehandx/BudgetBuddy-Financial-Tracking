@@ -430,9 +430,9 @@ body { font-family: var(--fn); background: var(--accent); color: var(--font-colo
 
   <!-- Import CSV -->
   <div class="card" style="border:2px solid var(--primary-lt)">
-    <div class="card-head"><div class="card-title">&#128196; Import bank statement</div></div>
-    <p style="font-size:14px;color:var(--muted);line-height:1.7;margin-bottom:14px">Upload a CSV export from your bank. Columns are detected automatically and duplicates are skipped.</p>
-    <button class="btn btn-primary btn-full" onclick="openImportModal()">Choose CSV file &rarr;</button>
+    <div class="card-head"><div class="card-title">&#128196; Upload financial report</div></div>
+    <p style="font-size:14px;color:var(--muted);line-height:1.7;margin-bottom:14px">Import a PDF or CSV from your bank to automatically log your transactions.</p>
+    <button class="btn btn-primary btn-full" onclick="openImportModal()">Upload financial report &rarr;</button>
   </div>
 
   <div class="card" style="border:2px solid var(--coral-lt)">
@@ -630,7 +630,7 @@ body { font-family: var(--fn); background: var(--accent); color: var(--font-colo
 <div class="overlay" id="m-import">
 <div class="modal" style="max-height:92vh">
   <div class="modal-handle"></div>
-  <div class="modal-title">&#128196; Import bank statement</div>
+  <div class="modal-title">&#128196; Upload financial report</div>
 
   <!-- Step 1: File picker -->
   <div id="imp-step1">
@@ -1490,10 +1490,6 @@ function setupPDFWorker() {
 
 function openImportModal() {
   resetImport();
-  setupPDFWorker();
-  const sel = el('imp-account');
-  sel.innerHTML = '<option value="">Select account...</option>' +
-    accounts.map(a => `<option value="${a.id}">${a.name} (${a.type})</option>`).join('');
   openModal('m-import');
 }
 
@@ -1772,8 +1768,11 @@ function init() {
           refreshOwnerSelects();
           refreshAccountSelects();
           if (m.target.id === 'm-import') {
-            const sel = el('imp-account');
-            if (sel) sel.innerHTML = '<option value="">Select account...</option>' + accounts.map(a=>`<option value="${a.id}">${a.name} (${a.type})</option>`).join('');
+            setupPDFWorker();
+            ['imp-account-csv','imp-account-pdf'].forEach(id => {
+              const sel = el(id);
+              if (sel) sel.innerHTML = '<option value="">Select account...</option>' + accounts.map(a=>`<option value="${a.id}">${a.name} (${a.type})</option>`).join('');
+            });
           }
         }
       });
