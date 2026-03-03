@@ -386,23 +386,27 @@ body { font-family: var(--fn); background: var(--accent); color: var(--font-colo
   <div class="card">
     <div class="card-head">
       <div class="card-title">Theme</div>
+      <span style="font-size:12px;color:var(--muted)">Font color auto-adjusts</span>
     </div>
-    <div class="form-row">
+    <div class="form-row mb12">
       <div class="form-group" style="margin-bottom:0">
-        <label class="form-label">Primary color</label>
-        <div class="swatch-row" id="primary-swatches"></div>
-        <input type="color" class="form-input mt8" id="primary-custom" style="height:44px;padding:6px" title="Custom color"/>
+        <label class="form-label">Button / accent color</label>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:6px">
+          <input type="color" id="primary-custom" value="#2d5a3d" style="width:54px;height:54px;border-radius:12px;border:2px solid var(--border);cursor:pointer;padding:3px;flex-shrink:0"/>
+          <div id="primary-preview" style="flex:1;height:54px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;transition:all .2s;font-family:var(--fn)">Button color</div>
+        </div>
       </div>
       <div class="form-group" style="margin-bottom:0">
-        <label class="form-label">Background color</label>
-        <div class="swatch-row" id="accent-swatches"></div>
-        <input type="color" class="form-input mt8" id="accent-custom" style="height:44px;padding:6px" title="Custom color"/>
+        <label class="form-label">Background color — pick anything</label>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:6px">
+          <input type="color" id="accent-custom" value="#f5f0e8" style="width:54px;height:54px;border-radius:12px;border:2px solid var(--border);cursor:pointer;padding:3px;flex-shrink:0"/>
+          <div id="accent-preview" style="flex:1;height:54px;border-radius:12px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;transition:all .2s;font-family:var(--fn)">Background</div>
+        </div>
       </div>
     </div>
-    <div class="form-group mt12" style="margin-bottom:0">
-      <label class="form-label">Font / text color</label>
-      <div class="swatch-row" id="font-swatches"></div>
-    </div>
+    <label class="form-label">Quick presets</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;margin-bottom:14px" id="theme-presets"></div>
+    <button class="btn btn-ghost btn-sm" onclick="resetTheme()">Reset to default</button>
   </div>
 
   <!-- People -->
@@ -421,6 +425,13 @@ body { font-family: var(--fn); background: var(--accent); color: var(--font-colo
   <div class="card">
     <div class="card-head"><div class="card-title">Income</div><button class="card-action" onclick="openModal('m-income')">+ Add income</button></div>
     <div id="setup-income"></div>
+  </div>
+
+  <!-- Import CSV -->
+  <div class="card" style="border:2px solid var(--primary-lt)">
+    <div class="card-head"><div class="card-title">&#128196; Import bank statement</div></div>
+    <p style="font-size:14px;color:var(--muted);line-height:1.7;margin-bottom:14px">Upload a CSV export from your bank. Columns are detected automatically and duplicates are skipped.</p>
+    <button class="btn btn-primary btn-full" onclick="openImportModal()">Choose CSV file &rarr;</button>
   </div>
 
   <div class="card" style="border:2px solid var(--coral-lt)">
@@ -614,7 +625,77 @@ body { font-family: var(--fn); background: var(--accent); color: var(--font-colo
 </div>
 </div>
 
-<script>
+<!-- CSV Import Modal -->
+<div class="overlay" id="m-import">
+<div class="modal" style="max-height:92vh">
+  <div class="modal-handle"></div>
+  <div class="modal-title">&#128196; Import bank statement</div>
+
+  <!-- Step 1: File picker -->
+  <div id="imp-step1">
+    <p style="font-size:14px;color:var(--muted);line-height:1.7;margin-bottom:16px">
+      Most banks let you export transactions as a CSV file. Look for an "Export" or "Download" button on your transactions page.<br><br>
+      <strong>Works with:</strong> Chase, Bank of America, Wells Fargo, Capital One, Citi, and most other banks.
+    </p>
+    <div style="border:2px dashed var(--border);border-radius:16px;padding:32px;text-align:center;cursor:pointer;transition:all .2s;background:var(--accent)" id="imp-dropzone" onclick="el('imp-file').click()" ondragover="event.preventDefault();this.style.borderColor='var(--primary)'" ondragleave="this.style.borderColor='var(--border)'" ondrop="handleFileDrop(event)">
+      <div style="font-size:36px;margin-bottom:10px">&#128196;</div>
+      <div style="font-weight:700;font-size:15px">Drop CSV here or click to browse</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:6px">.csv files only</div>
+    </div>
+    <input type="file" id="imp-file" accept=".csv,.txt" style="display:none" onchange="handleFileSelect(event)"/>
+    <div class="form-group mt12" style="margin-bottom:0">
+      <label class="form-label">Which account is this from?</label>
+      <select class="form-input" id="imp-account">
+        <option value="">Select account...</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Step 2: Column mapping -->
+  <div id="imp-step2" style="display:none">
+    <div style="background:var(--primary-lt);border-radius:12px;padding:14px 16px;margin-bottom:16px;font-size:14px">
+      Found <strong id="imp-row-count">0</strong> transactions. Map the columns below, then review.
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Date column</label>
+        <select class="form-input" id="imp-col-date"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description column</label>
+        <select class="form-input" id="imp-col-desc"></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Amount column</label>
+        <select class="form-input" id="imp-col-amt"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Amount sign</label>
+        <select class="form-input" id="imp-sign">
+          <option value="negative">Negative = spending (most banks)</option>
+          <option value="positive">Positive = spending</option>
+          <option value="debit">Separate debit column</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-full mb8" onclick="previewImport()">Preview &#8594;</button>
+    <button class="btn btn-ghost btn-full" onclick="resetImport()">&#8592; Back</button>
+  </div>
+
+  <!-- Step 3: Preview & confirm -->
+  <div id="imp-step3" style="display:none">
+    <div id="imp-preview-summary" style="background:var(--primary-lt);border-radius:12px;padding:14px 16px;margin-bottom:14px;font-size:14px"></div>
+    <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:12px;margin-bottom:14px">
+      <table style="width:100%;border-collapse:collapse;font-size:13px" id="imp-preview-table"></table>
+    </div>
+    <button class="btn btn-primary btn-full mb8" onclick="confirmImport()">Import all &#10003;</button>
+    <button class="btn btn-ghost btn-full" onclick="backToMapping()">&#8592; Re-map columns</button>
+  </div>
+</div>
+</div>
+
 // ════════════════════════════════
 //  STATE
 // ════════════════════════════════
@@ -651,20 +732,33 @@ let currentPerson = 'all'; // 'all' or person id
 //  THEME
 // ════════════════════════════════
 const PRIMARY_SWATCHES = ['#2d5a3d','#1a4a6b','#5a2d7a','#8b2020','#4a4a2d','#1a5a5a','#2d2d5a'];
-const ACCENT_SWATCHES  = ['#f5f0e8','#e8f0f5','#f0e8f5','#f5e8e8','#e8f5e8','#f5f5e8','#ffffff'];
+const ACCENT_SWATCHES  = ['#f5f0e8','#ffffff','#e8f3fa','#f5f0fa','#0f172a','#1e1e1e','#2a1a0e'];
 const FONT_SWATCHES    = ['#2c2825','#1a2030','#2d1a0e','#0a1a0a','#1a1a2e'];
 
+function getLuminance(hex) {
+  if (!hex || hex.length < 7) return 0.5;
+  const r=parseInt(hex.slice(1,3),16)/255, g=parseInt(hex.slice(3,5),16)/255, b=parseInt(hex.slice(5,7),16)/255;
+  const lin = c => c<=0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055,2.4);
+  return 0.2126*lin(r)+0.7152*lin(g)+0.0722*lin(b);
+}
+function autoFontColor(bgHex) { return getLuminance(bgHex)>0.35 ? '#2c2825' : '#f0ede8'; }
+
 function applyTheme() {
-  const r = document.documentElement.style;
+  const s = document.documentElement.style;
   const p = settings.primaryColor || '#2d5a3d';
   const a = settings.accentColor  || '#f5f0e8';
-  const f = settings.fontColor    || '#2c2825';
-  r.setProperty('--primary', p);
-  r.setProperty('--accent',  a);
-  r.setProperty('--font-color', f);
-  // Derive lighter variants
-  r.setProperty('--primary-lt',  hexToAlpha(p, .12));
-  r.setProperty('--primary-mid', hexToAlpha(p, .3));
+  const lum = getLuminance(a);
+  const f = autoFontColor(a);
+  settings.fontColor = f;
+  s.setProperty('--primary', p);
+  s.setProperty('--accent',  a);
+  s.setProperty('--font-color', f);
+  s.setProperty('--surface',   lum<0.08 ? '#2e2e2e' : lum<0.22 ? '#383838' : '#ffffff');
+  s.setProperty('--border',    lum<0.22 ? 'rgba(255,255,255,.14)' : '#e0d9ce');
+  s.setProperty('--muted',     lum<0.22 ? 'rgba(255,255,255,.52)' : '#7a736b');
+  s.setProperty('--dim',       lum<0.22 ? 'rgba(255,255,255,.28)' : '#b0a898');
+  s.setProperty('--primary-lt',  hexToAlpha(p,.15));
+  s.setProperty('--primary-mid', hexToAlpha(p,.32));
 }
 
 function hexToAlpha(hex, alpha) {
@@ -673,17 +767,63 @@ function hexToAlpha(hex, alpha) {
 }
 
 function buildSwatches() {
-  const makeRow = (containerId, colors, settingKey, onChange) => {
-    const c = el(containerId); if (!c) return;
-    c.innerHTML = colors.map(col => `<div class="swatch ${settings[settingKey]===col?'active':''}" style="background:${col}" onclick="setTheme('${settingKey}','${col}','${containerId}')"></div>`).join('');
-  };
-  makeRow('primary-swatches', PRIMARY_SWATCHES, 'primaryColor');
-  makeRow('accent-swatches',  ACCENT_SWATCHES,  'accentColor');
-  makeRow('font-swatches',    FONT_SWATCHES,     'fontColor');
-  el('primary-custom').value = settings.primaryColor || '#2d5a3d';
-  el('accent-custom').value  = settings.accentColor  || '#f5f0e8';
-  el('primary-custom').addEventListener('input', e => setTheme('primaryColor', e.target.value, 'primary-swatches'));
-  el('accent-custom').addEventListener('input',  e => setTheme('accentColor',  e.target.value, 'accent-swatches'));
+  const pc = el('primary-custom'), ac = el('accent-custom');
+  if (!pc || !ac) return;
+  pc.value = settings.primaryColor || '#2d5a3d';
+  ac.value = settings.accentColor  || '#f5f0e8';
+  updateColorPreviews();
+  // Remove old listeners by cloning
+  const pc2 = pc.cloneNode(true); pc.parentNode.replaceChild(pc2, pc);
+  const ac2 = ac.cloneNode(true); ac.parentNode.replaceChild(ac2, ac);
+  el('primary-custom').addEventListener('input', e => { setTheme('primaryColor', e.target.value); updateColorPreviews(); });
+  el('accent-custom').addEventListener('input',  e => { setTheme('accentColor',  e.target.value); updateColorPreviews(); });
+  buildPresets();
+}
+
+function updateColorPreviews() {
+  const p = settings.primaryColor || '#2d5a3d';
+  const a = settings.accentColor  || '#f5f0e8';
+  const pp = el('primary-preview'), ap = el('accent-preview');
+  if (pp) { pp.style.background = p; pp.style.color = autoFontColor(p); }
+  if (ap) { ap.style.background = a; ap.style.color = autoFontColor(a); ap.style.border = '2px solid ' + (getLuminance(a) > 0.85 ? '#e0d9ce' : 'transparent'); }
+}
+
+const THEME_PRESETS = [
+  {name:'Pine & Cream', primary:'#2d5a3d', accent:'#f5f0e8'},
+  {name:'Ocean',        primary:'#1a4a6b', accent:'#e8f3fa'},
+  {name:'Midnight',     primary:'#7c6af7', accent:'#0f0f1a'},
+  {name:'Slate',        primary:'#475569', accent:'#f1f5f9'},
+  {name:'Rose',         primary:'#9f3a5a', accent:'#fff0f4'},
+  {name:'Espresso',     primary:'#a0522d', accent:'#2a1a0e'},
+  {name:'Forest Dark',  primary:'#5dbd7a', accent:'#0d1f14'},
+  {name:'Sky',          primary:'#0369a1', accent:'#f0f9ff'},
+  {name:'Plum',         primary:'#7e22ce', accent:'#faf5ff'},
+  {name:'Charcoal',     primary:'#22d3ee', accent:'#111827'},
+];
+
+function buildPresets() {
+  const container = el('theme-presets'); if (!container) return;
+  container.innerHTML = THEME_PRESETS.map(t => `
+    <button onclick="applyPreset('${t.primary}','${t.accent}')" title="${t.name}"
+      style="display:flex;align-items:center;gap:0;border:2px solid ${
+        settings.primaryColor===t.primary && settings.accentColor===t.accent ? '#333' : 'transparent'
+      };border-radius:30px;overflow:hidden;cursor:pointer;padding:0;height:32px;min-width:52px">
+      <div style="width:26px;height:32px;background:${t.accent}"></div>
+      <div style="width:26px;height:32px;background:${t.primary}"></div>
+    </button>`).join('');
+}
+
+function applyPreset(primary, accent) {
+  settings.primaryColor = primary; settings.accentColor = accent;
+  persist(); applyTheme();
+  el('primary-custom').value = primary;
+  el('accent-custom').value  = accent;
+  updateColorPreviews(); buildPresets();
+}
+
+function resetTheme() {
+  settings.primaryColor = '#2d5a3d'; settings.accentColor = '#f5f0e8';
+  persist(); applyTheme(); buildSwatches();
 }
 
 function setTheme(key, value, swatchRowId) {
@@ -1253,6 +1393,180 @@ function clearAllData() {
 }
 
 // ════════════════════════════════
+//  CSV IMPORT
+// ════════════════════════════════
+let _csvRows = [], _csvHeaders = [];
+
+function openImportModal() {
+  resetImport();
+  // Populate account dropdown
+  const sel = el('imp-account');
+  sel.innerHTML = '<option value="">Select account...</option>' +
+    accounts.map(a => `<option value="${a.id}">${a.name} (${a.type})</option>`).join('');
+  openModal('m-import');
+}
+
+function handleFileDrop(e) {
+  e.preventDefault();
+  el('imp-dropzone').style.borderColor = 'var(--border)';
+  const file = e.dataTransfer?.files?.[0];
+  if (file) processCSVFile(file);
+}
+
+function handleFileSelect(e) {
+  const file = e.target.files?.[0];
+  if (file) processCSVFile(file);
+}
+
+function processCSVFile(file) {
+  if (!file.name.match(/\.(csv|txt)$/i)) { toast('Please upload a .csv file'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result;
+    const parsed = parseCSV(text);
+    if (parsed.rows.length === 0) { toast('No data found in file'); return; }
+    _csvHeaders = parsed.headers;
+    _csvRows    = parsed.rows;
+    populateColumnSelects(parsed.headers, parsed.rows);
+    el('imp-row-count').textContent = parsed.rows.length;
+    el('imp-step1').style.display = 'none';
+    el('imp-step2').style.display = 'block';
+  };
+  reader.readAsText(file);
+}
+
+function parseCSV(text) {
+  // Detect delimiter
+  const firstLine = text.split('\n')[0];
+  const delim = firstLine.includes('\t') ? '\t' : firstLine.includes(';') ? ';' : ',';
+  const lines = text.trim().split('\n').filter(l => l.trim());
+  if (lines.length < 2) return {headers:[], rows:[]};
+
+  const splitLine = line => {
+    const result = []; let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQ = !inQ; }
+      else if (c === delim && !inQ) { result.push(cur.trim()); cur = ''; }
+      else cur += c;
+    }
+    result.push(cur.trim()); return result;
+  };
+
+  const headers = splitLine(lines[0]).map(h => h.replace(/^"|"$/g,'').trim());
+  const rows = lines.slice(1).map(l => {
+    const cols = splitLine(l);
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = (cols[i]||'').replace(/^"|"$/g,'').trim());
+    return obj;
+  }).filter(r => Object.values(r).some(v => v));
+
+  return {headers, rows};
+}
+
+function populateColumnSelects(headers, rows) {
+  const opts = headers.map(h => `<option value="${h}">${h}</option>`).join('');
+  ['imp-col-date','imp-col-desc','imp-col-amt'].forEach(id => el(id).innerHTML = opts);
+
+  // Auto-detect columns by common names
+  const guess = (patterns) => headers.find(h => patterns.some(p => h.toLowerCase().includes(p))) || headers[0];
+  el('imp-col-date').value = guess(['date','time','posted','transaction date','trans date']);
+  el('imp-col-desc').value = guess(['description','desc','memo','payee','name','merchant','details','narrative']);
+  el('imp-col-amt').value  = guess(['amount','debit','charge','withdrawal','credit','sum']);
+
+  // Detect sign convention from data
+  const amtCol = el('imp-col-amt').value;
+  const sample = rows.slice(0,10).map(r => parseFloat((r[amtCol]||'0').replace(/[$,]/g,''))).filter(n => !isNaN(n));
+  const hasNeg = sample.some(n => n < 0);
+  el('imp-sign').value = hasNeg ? 'negative' : 'positive';
+}
+
+let _pendingImport = [];
+
+function previewImport() {
+  const acctId = val('imp-account');
+  if (!acctId) { toast('Please select an account first'); return; }
+  const dateCol = val('imp-col-date'), descCol = val('imp-col-desc'), amtCol = val('imp-col-amt'), sign = val('imp-sign');
+  if (!dateCol || !descCol || !amtCol) { toast('Please map all columns'); return; }
+
+  // Build existing fingerprint set for dedup
+  const fingerprints = new Set(transactions.map(t => t.fp).filter(Boolean));
+
+  _pendingImport = [];
+  let skipped = 0;
+
+  _csvRows.forEach(row => {
+    const rawDate = row[dateCol] || '';
+    const rawAmt  = row[amtCol]  || '0';
+    const desc    = row[descCol] || 'Purchase';
+
+    // Parse date
+    let dateStr = today();
+    const d = new Date(rawDate);
+    if (!isNaN(d)) dateStr = d.toISOString().slice(0,10);
+
+    // Parse amount — always store as positive (spending)
+    let amt = parseFloat(rawAmt.replace(/[$,\s]/g,'')) || 0;
+    if (sign === 'negative') amt = Math.abs(amt);
+    else if (sign === 'positive') amt = Math.abs(amt);
+    if (amt <= 0) return; // skip zero or credit rows
+
+    // Fingerprint for dedup
+    const fp = btoa(unescape(encodeURIComponent(`${dateStr}|${desc}|${amt.toFixed(2)}`))).slice(0, 20);
+    if (fingerprints.has(fp)) { skipped++; return; }
+
+    _pendingImport.push({ dateStr, desc, amt, fp, acctId, ownerId: accounts.find(a=>a.id===acctId)?.ownerId||'all' });
+  });
+
+  el('imp-preview-summary').innerHTML = `
+    <strong>${_pendingImport.length}</strong> new transactions to import.
+    ${skipped > 0 ? `<span style="color:var(--muted)"> ${skipped} duplicates skipped.</span>` : ''}
+    ${_pendingImport.length === 0 ? '<br>All transactions already exist — nothing to import.' : ''}`;
+
+  el('imp-preview-table').innerHTML = `
+    <thead><tr style="border-bottom:2px solid var(--border)">
+      ${['Date','Description','Amount'].map(h=>`<th style="padding:8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700">${h}</th>`).join('')}
+    </tr></thead>
+    <tbody>${_pendingImport.slice(0,50).map(t=>`<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px;color:var(--muted);white-space:nowrap">${t.dateStr}</td>
+      <td style="padding:8px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.desc}</td>
+      <td style="padding:8px;font-weight:700;color:var(--coral)">${fmt(t.amt)}</td>
+    </tr>`).join('')}
+    ${_pendingImport.length > 50 ? `<tr><td colspan="3" style="padding:10px;text-align:center;color:var(--muted);font-size:13px">...and ${_pendingImport.length-50} more</td></tr>` : ''}
+    </tbody>`;
+
+  el('imp-step2').style.display = 'none';
+  el('imp-step3').style.display = 'block';
+}
+
+function confirmImport() {
+  if (!_pendingImport.length) { closeModal('m-import'); return; }
+  _pendingImport.forEach(t => {
+    transactions.push({ id:uid(), accountId:t.acctId, categoryId:'', note:t.desc, amount:t.amt, date:t.dateStr, ownerId:t.ownerId, fp:t.fp });
+    const acct = accounts.find(a=>a.id===t.acctId);
+    if (acct) acct.balance = (acct.balance||0) - t.amt;
+  });
+  persist(); resetImport(); closeModal('m-import');
+  toast(`${_pendingImport.length} transactions imported ✓`);
+  _pendingImport = [];
+  if (curPage === 'spend') renderSpend();
+  else if (curPage === 'budget') renderBudget();
+}
+
+function backToMapping() {
+  el('imp-step3').style.display = 'none';
+  el('imp-step2').style.display = 'block';
+}
+
+function resetImport() {
+  _csvRows = []; _csvHeaders = []; _pendingImport = [];
+  el('imp-step1').style.display = 'block';
+  el('imp-step2').style.display = 'none';
+  el('imp-step3').style.display = 'none';
+  const fi = el('imp-file'); if (fi) fi.value = '';
+}
+
+// ════════════════════════════════
 //  INIT
 // ════════════════════════════════
 function renderAll() { showPage(curPage); }
@@ -1269,7 +1583,7 @@ function init() {
 }
 
 // Refresh selects when modals open
-['m-person','m-account','m-income','m-cat','m-bill','m-savings'].forEach(id => {
+['m-person','m-account','m-income','m-cat','m-bill','m-savings','m-import'].forEach(id => {
   const overlay = el(id);
   if (overlay) {
     const observer = new MutationObserver(mutations => {
@@ -1277,6 +1591,10 @@ function init() {
         if (m.target.classList.contains('open')) {
           refreshOwnerSelects();
           refreshAccountSelects();
+          if (m.target.id === 'm-import') {
+            const sel = el('imp-account');
+            if (sel) sel.innerHTML = '<option value="">Select account...</option>' + accounts.map(a=>`<option value="${a.id}">${a.name} (${a.type})</option>`).join('');
+          }
         }
       });
     });
