@@ -626,7 +626,7 @@ body { font-family: var(--fn); background: var(--accent); color: var(--font-colo
 </div>
 </div>
 
-<!-- CSV Import Modal -->
+<!-- Import Modal -->
 <div class="overlay" id="m-import">
 <div class="modal" style="max-height:92vh">
   <div class="modal-handle"></div>
@@ -635,56 +635,41 @@ body { font-family: var(--fn); background: var(--accent); color: var(--font-colo
   <!-- Step 1: File picker -->
   <div id="imp-step1">
     <p style="font-size:14px;color:var(--muted);line-height:1.7;margin-bottom:16px">
-      Most banks let you download a PDF or CSV of your transactions. Both work here.<br><br>
-      <strong>Works with:</strong> Chase, Bank of America, Wells Fargo, Capital One, Citi, and most others — PDF or CSV.
+      Download your transactions from your bank's website and upload here. Works with PDF and CSV.
     </p>
-    <div style="border:2px dashed var(--border);border-radius:16px;padding:32px;text-align:center;cursor:pointer;transition:all .2s;background:var(--accent)" id="imp-dropzone" onclick="el('imp-file').click()" ondragover="event.preventDefault();this.style.borderColor='var(--primary)'" ondragleave="this.style.borderColor='var(--border)'" ondrop="handleFileDrop(event)">
-      <div style="font-size:36px;margin-bottom:10px">&#128196;</div>
-      <div style="font-weight:700;font-size:15px">Drop file here or click to browse</div>
-      <div style="font-size:13px;color:var(--muted);margin-top:6px">CSV or PDF bank statements</div>
+    <div style="border:2px dashed var(--border);border-radius:16px;padding:36px 20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--accent)" id="imp-dropzone" onclick="el('imp-file').click()" ondragover="event.preventDefault();this.style.borderColor='var(--primary)';this.style.background='var(--primary-lt)'" ondragleave="this.style.borderColor='var(--border)';this.style.background='var(--accent)'" ondrop="handleFileDrop(event)">
+      <div style="font-size:40px;margin-bottom:10px">&#128196;</div>
+      <div style="font-weight:800;font-size:16px">Tap to choose file</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:6px">PDF or CSV · drag &amp; drop also works</div>
     </div>
     <input type="file" id="imp-file" accept=".csv,.txt,.pdf" style="display:none" onchange="handleFileSelect(event)"/>
-    <div id="imp-loading" style="display:none;text-align:center;padding:24px">
-      <div style="font-size:32px;margin-bottom:10px">&#128203;</div>
-      <div style="font-weight:700;margin-bottom:6px">Reading your PDF...</div>
-      <div id="imp-loading-sub" style="font-size:13px;color:var(--muted)">Extracting transactions</div>
-    </div>
-    <div class="form-group mt12" style="margin-bottom:0">
-      <label class="form-label">Which account is this from?</label>
-      <select class="form-input" id="imp-account">
-        <option value="">Select account...</option>
-      </select>
+    <div id="imp-loading" style="display:none;text-align:center;padding:28px 20px">
+      <div style="font-size:40px;margin-bottom:12px">&#128203;</div>
+      <div style="font-weight:700;font-size:16px;margin-bottom:6px">Reading your statement...</div>
+      <div id="imp-loading-sub" style="font-size:13px;color:var(--muted)">Please wait</div>
     </div>
   </div>
 
-  <!-- Step 2: Column mapping -->
+  <!-- Step 2: CSV column mapping -->
   <div id="imp-step2" style="display:none">
     <div style="background:var(--primary-lt);border-radius:12px;padding:14px 16px;margin-bottom:16px;font-size:14px">
-      Found <strong id="imp-row-count">0</strong> transactions. Map the columns below, then review.
+      Found <strong id="imp-row-count">0</strong> rows. Map the columns below.
     </div>
     <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Date column</label>
-        <select class="form-input" id="imp-col-date"></select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Description column</label>
-        <select class="form-input" id="imp-col-desc"></select>
-      </div>
+      <div class="form-group"><label class="form-label">Date column</label><select class="form-input" id="imp-col-date"></select></div>
+      <div class="form-group"><label class="form-label">Description column</label><select class="form-input" id="imp-col-desc"></select></div>
     </div>
     <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Amount column</label>
-        <select class="form-input" id="imp-col-amt"></select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Amount sign</label>
+      <div class="form-group"><label class="form-label">Amount column</label><select class="form-input" id="imp-col-amt"></select></div>
+      <div class="form-group"><label class="form-label">Sign convention</label>
         <select class="form-input" id="imp-sign">
-          <option value="negative">Negative = spending (most banks)</option>
+          <option value="negative">Negative = spending</option>
           <option value="positive">Positive = spending</option>
-          <option value="debit">Separate debit column</option>
         </select>
       </div>
+    </div>
+    <div class="form-group"><label class="form-label">Which account?</label>
+      <select class="form-input" id="imp-account-csv"><option value="">Select account...</option></select>
     </div>
     <button class="btn btn-primary btn-full mb8" onclick="previewImport()">Preview &#8594;</button>
     <button class="btn btn-ghost btn-full" onclick="resetImport()">&#8592; Back</button>
@@ -693,12 +678,57 @@ body { font-family: var(--fn); background: var(--accent); color: var(--font-colo
   <!-- Step 3: Preview & confirm -->
   <div id="imp-step3" style="display:none">
     <div id="imp-preview-summary" style="background:var(--primary-lt);border-radius:12px;padding:14px 16px;margin-bottom:14px;font-size:14px"></div>
-    <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:12px;margin-bottom:14px">
-      <table style="width:100%;border-collapse:collapse;font-size:13px" id="imp-preview-table"></table>
+    <!-- Account picker shown here for PDF flow -->
+    <div id="imp-acct-pick" style="display:none;margin-bottom:14px">
+      <label class="form-label">Which account is this from?</label>
+      <select class="form-input mt8" id="imp-account-pdf"><option value="">Select account...</option></select>
     </div>
-    <button class="btn btn-primary btn-full mb8" onclick="confirmImport()">Import all &#10003;</button>
+    <div style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:12px;margin-bottom:14px">
+      <table style="width:100%;border-collapse:collapse" id="imp-preview-table"></table>
+    </div>
+    <button class="btn btn-primary btn-full mb8" onclick="confirmImport()">Import &#10003;</button>
     <button id="imp-back-remap" class="btn btn-ghost btn-full" onclick="backToMapping()">&#8592; Re-map columns</button>
   </div>
+</div>
+</div>
+
+<!-- Edit Account Modal -->
+<div class="overlay" id="m-edit-account">
+<div class="modal">
+  <div class="modal-handle"></div>
+  <div class="modal-title">Edit account</div>
+  <input type="hidden" id="eac-id"/>
+  <div class="form-row">
+    <div class="form-group"><label class="form-label">Nickname</label><input class="form-input" id="eac-name"/></div>
+    <div class="form-group"><label class="form-label">Type</label>
+      <select class="form-input" id="eac-type" onchange="toggleEditAccountFields()">
+        <option value="bank">Bank / Checking</option>
+        <option value="savings">Savings</option>
+        <option value="credit">Credit Card</option>
+        <option value="loan">Loan</option>
+      </select>
+    </div>
+  </div>
+  <div class="form-row">
+    <div class="form-group"><label class="form-label">Current balance ($)</label><input class="form-input" type="number" id="eac-balance" step="0.01"/></div>
+    <div class="form-group"><label class="form-label">Owner</label><select class="form-input" id="eac-owner"></select></div>
+  </div>
+  <div id="eac-credit-fields">
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">APR (%)</label><input class="form-input" type="number" id="eac-apr" step="0.01"/></div>
+      <div class="form-group"><label class="form-label">Due day</label><input class="form-input" type="number" id="eac-due" min="1" max="31"/></div>
+    </div>
+    <div class="form-group"><label class="form-label">Credit limit ($)</label><input class="form-input" type="number" id="eac-limit" step="0.01"/></div>
+  </div>
+  <div id="eac-loan-fields" style="display:none">
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Loan term (months)</label><input class="form-input" type="number" id="eac-term"/></div>
+      <div class="form-group"><label class="form-label">Start date</label><input class="form-input" type="date" id="eac-startdate"/></div>
+    </div>
+    <div class="form-group"><label class="form-label">Original loan amount ($)</label><input class="form-input" type="number" id="eac-original" step="0.01"/></div>
+  </div>
+  <button class="btn btn-primary btn-full" onclick="saveEditAccount()">Save changes</button>
+  <button class="btn btn-ghost btn-full mt8" onclick="closeModal('m-edit-account')">Cancel</button>
 </div>
 </div>
 
@@ -1275,6 +1305,7 @@ function renderSetup() {
             <div class="setup-name">${a.name}</div>
             <div class="setup-detail">${fmt(a.balance)} balance${isDebt?' &middot; '+(a.apr||0).toFixed(1)+'% APR':''} &middot; <span class="tag tag-gray">${a.type}</span>${owner?' &middot; '+owner.name:''}</div>
           </div>
+          <button onclick="editAccount('${a.id}')" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:13px;font-weight:700;padding:4px 8px;font-family:var(--fn)">Edit</button>
           <button class="setup-del" onclick="deleteAccount('${a.id}')">&times;</button>
         </div>`;
       }).join('')
@@ -1378,6 +1409,53 @@ function deleteAccount(id) {
   accounts = accounts.filter(a=>a.id!==id); persist(); renderSetup();
   if (curPage==='plan') renderPlan();
 }
+
+function editAccount(id) {
+  const a = accounts.find(x=>x.id===id); if (!a) return;
+  el('eac-id').value    = id;
+  el('eac-name').value  = a.name;
+  el('eac-type').value  = a.type;
+  el('eac-balance').value = a.balance || 0;
+  el('eac-apr').value   = a.apr || '';
+  el('eac-due').value   = a.dueDay || '';
+  el('eac-limit').value = a.limit || '';
+  el('eac-term').value  = a.loanTerm || '';
+  el('eac-startdate').value = a.startDate || '';
+  el('eac-original').value  = a.originalBalance || '';
+  refreshOwnerSelects();
+  el('eac-owner').value = a.ownerId || 'all';
+  toggleEditAccountFields();
+  openModal('m-edit-account');
+}
+
+function toggleEditAccountFields() {
+  const type = val('eac-type');
+  el('eac-credit-fields').style.display = (type==='credit'||type==='loan') ? 'block' : 'none';
+  el('eac-loan-fields').style.display   = type==='loan' ? 'block' : 'none';
+}
+
+function saveEditAccount() {
+  const id = val('eac-id');
+  const idx = accounts.findIndex(a=>a.id===id); if (idx<0) return;
+  const name = val('eac-name').trim(), type = val('eac-type');
+  if (!name) { toast('Please enter an account name'); return; }
+  const balance = parseFloat(val('eac-balance'))||0;
+  accounts[idx] = { ...accounts[idx], name, type, balance, ownerId: val('eac-owner') };
+  if (type==='credit'||type==='loan') {
+    accounts[idx].apr      = parseFloat(val('eac-apr'))||0;
+    accounts[idx].dueDay   = parseInt(val('eac-due'))||1;
+    accounts[idx].limit    = parseFloat(val('eac-limit'))||0;
+    accounts[idx].minPayment = Math.max(25, balance*0.02);
+  }
+  if (type==='loan') {
+    accounts[idx].loanTerm        = parseInt(val('eac-term'))||60;
+    accounts[idx].startDate       = val('eac-startdate');
+    accounts[idx].originalBalance = parseFloat(val('eac-original'))||balance;
+  }
+  persist(); closeModal('m-edit-account'); renderSetup();
+  if (curPage==='plan') renderPlan();
+  toast(`${name} updated ✓`);
+}
 function deleteIncome(id) { income = income.filter(i=>i.id!==id); persist(); renderSetup(); }
 function deleteCategory(id) { categories = categories.filter(c=>c.id!==id); persist(); renderBudget(); }
 function deleteBill(id) { bills = bills.filter(b=>b.id!==id); persist(); renderBudget(); }
@@ -1439,14 +1517,14 @@ function dispatchFile(file) {
 
 // ── PDF ──
 async function processPDFFile(file) {
-  if (!window.pdfjsLib) { toast('PDF library not loaded — try again in a moment'); return; }
-  const acctId = val('imp-account');
-  if (!acctId) { toast('Please select an account first'); return; }
+  if (!window.pdfjsLib) { toast('PDF library not loaded — check your connection'); return; }
   el('imp-dropzone').style.display = 'none';
   el('imp-loading').style.display = 'block';
+  // Use inline fake worker — works in all browsers, no CDN dependency for worker
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `data:application/javascript,`;
   try {
     const buf = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf), useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true }).promise;
     let fullText = '';
     for (let p = 1; p <= pdf.numPages; p++) {
       el('imp-loading-sub').textContent = `Reading page ${p} of ${pdf.numPages}...`;
@@ -1467,13 +1545,25 @@ async function processPDFFile(file) {
     el('imp-loading').style.display = 'none';
     el('imp-dropzone').style.display = 'block';
     const parsed = parsePDFTransactions(fullText);
-    if (!parsed.length) { toast('Could not detect transactions in this PDF. Try the CSV export instead.'); return; }
-    buildDirectPreview(parsed, acctId);
+    if (!parsed.length) {
+      toast('No transactions found in this PDF. Make sure it\'s a text PDF, not a scanned image. Try CSV instead.');
+      return;
+    }
+    _pendingImport = parsed.map(({ dateStr, desc, amt }) => ({
+      dateStr, desc, amt, fp: btoa(unescape(encodeURIComponent(`${dateStr}|${desc}|${amt.toFixed(2)}`))).slice(0,20),
+      acctId: '', ownerId: 'all'
+    }));
+    // Populate account picker in preview step
+    const sel = el('imp-account-pdf');
+    sel.innerHTML = '<option value="">Select account...</option>' + accounts.map(a=>`<option value="${a.id}">${a.name} (${a.type})</option>`).join('');
+    el('imp-acct-pick').style.display = 'block';
+    el('imp-back-remap').style.display = 'none';
+    showPreviewStep(parsed.length, 0);
   } catch (err) {
     el('imp-loading').style.display = 'none';
     el('imp-dropzone').style.display = 'block';
     console.error('PDF error:', err);
-    toast('Could not read this PDF. Try the CSV export from your bank instead.');
+    toast('Could not read this PDF — try downloading as CSV from your bank instead.');
   }
 }
 
@@ -1525,20 +1615,12 @@ function parsePDFTransactions(text) {
   });
 }
 
-function buildDirectPreview(parsed, acctId) {
-  const fingerprints = new Set(transactions.map(t => t.fp).filter(Boolean));
-  _pendingImport = []; let skipped = 0;
-  parsed.forEach(({ dateStr, desc, amt }) => {
-    const fp = btoa(unescape(encodeURIComponent(`${dateStr}|${desc}|${amt.toFixed(2)}`))).slice(0, 20);
-    if (fingerprints.has(fp)) { skipped++; return; }
-    _pendingImport.push({ dateStr, desc, amt, fp, acctId, ownerId: accounts.find(a=>a.id===acctId)?.ownerId||'all' });
-  });
-  el('imp-preview-summary').innerHTML = `<strong>${_pendingImport.length}</strong> transactions found in PDF.${skipped > 0 ? ` <span style="color:var(--muted)">${skipped} duplicates skipped.</span>` : ''}${_pendingImport.length === 0 ? '<br>Everything already imported — nothing new.' : '<br>Review below, then hit Import.'}`;
+function showPreviewStep(total, skipped) {
+  el('imp-preview-summary').innerHTML = `<strong>${total - skipped}</strong> new transactions to import.${skipped > 0 ? ` <span style="color:var(--muted)">${skipped} already imported, skipped.</span>` : ''}${total - skipped === 0 ? '<br>Nothing new to import.' : '<br>Review below, then tap Import.'}`;
   el('imp-preview-table').innerHTML = buildPreviewTable(_pendingImport);
   el('imp-step1').style.display = 'none';
   el('imp-step2').style.display = 'none';
   el('imp-step3').style.display = 'block';
-  const rb = el('imp-back-remap'); if (rb) rb.style.display = 'none';
 }
 
 function buildPreviewTable(rows) {
@@ -1549,19 +1631,18 @@ function buildPreviewTable(rows) {
 
 // ── CSV ──
 function processCSVFile(file) {
-  if (!file.name.match(/\.(csv|txt)$/i)) { toast('Please upload a PDF or CSV file'); return; }
   const reader = new FileReader();
   reader.onload = e => {
-    const text = e.target.result;
-    const parsed = parseCSV(text);
-    if (parsed.rows.length === 0) { toast('No data found in file'); return; }
-    _csvHeaders = parsed.headers;
-    _csvRows    = parsed.rows;
+    const parsed = parseCSV(e.target.result);
+    if (!parsed.rows.length) { toast('No data found in this file'); return; }
+    _csvHeaders = parsed.headers; _csvRows = parsed.rows;
+    // Populate CSV account selector
+    const sel = el('imp-account-csv');
+    sel.innerHTML = '<option value="">Select account...</option>' + accounts.map(a=>`<option value="${a.id}">${a.name} (${a.type})</option>`).join('');
     populateColumnSelects(parsed.headers, parsed.rows);
     el('imp-row-count').textContent = parsed.rows.length;
     el('imp-step1').style.display = 'none';
     el('imp-step2').style.display = 'block';
-    const rb = el('imp-back-remap'); if (rb) rb.style.display = '';
   };
   reader.readAsText(file);
 }
@@ -1583,8 +1664,7 @@ function parseCSV(text) {
   };
   const headers = splitLine(lines[0]).map(h => h.replace(/^"|"$/g,'').trim());
   const rows = lines.slice(1).map(l => {
-    const cols = splitLine(l);
-    const obj = {};
+    const cols = splitLine(l); const obj = {};
     headers.forEach((h, i) => obj[h] = (cols[i]||'').replace(/^"|"$/g,'').trim());
     return obj;
   }).filter(r => Object.values(r).some(v => v));
@@ -1593,53 +1673,61 @@ function parseCSV(text) {
 
 function populateColumnSelects(headers, rows) {
   const opts = headers.map(h => `<option value="${h}">${h}</option>`).join('');
-  ['imp-col-date','imp-col-desc','imp-col-amt'].forEach(id => el(id).innerHTML = opts);
+  ['imp-col-date','imp-col-desc','imp-col-amt'].forEach(id => { const e = el(id); if(e) e.innerHTML = opts; });
   const guess = patterns => headers.find(h => patterns.some(p => h.toLowerCase().includes(p))) || headers[0];
-  el('imp-col-date').value = guess(['date','time','posted','transaction date','trans date']);
-  el('imp-col-desc').value = guess(['description','desc','memo','payee','name','merchant','details','narrative']);
-  el('imp-col-amt').value  = guess(['amount','debit','charge','withdrawal','credit','sum']);
-  const amtCol = el('imp-col-amt').value;
-  const sample = rows.slice(0,10).map(r => parseFloat((r[amtCol]||'0').replace(/[$,]/g,''))).filter(n => !isNaN(n));
-  el('imp-sign').value = sample.some(n => n < 0) ? 'negative' : 'positive';
+  if(el('imp-col-date')) el('imp-col-date').value = guess(['date','time','posted','transaction date','trans date']);
+  if(el('imp-col-desc')) el('imp-col-desc').value = guess(['description','desc','memo','payee','name','merchant','details','narrative']);
+  if(el('imp-col-amt'))  el('imp-col-amt').value  = guess(['amount','debit','charge','withdrawal','credit','sum']);
+  const amtCol = el('imp-col-amt')?.value;
+  if (amtCol) {
+    const sample = rows.slice(0,10).map(r => parseFloat((r[amtCol]||'0').replace(/[$,]/g,''))).filter(n => !isNaN(n));
+    if(el('imp-sign')) el('imp-sign').value = sample.some(n => n < 0) ? 'negative' : 'positive';
+  }
 }
 
 function previewImport() {
-  const acctId = val('imp-account');
-  if (!acctId) { toast('Please select an account first'); return; }
+  const acctId = val('imp-account-csv');
+  if (!acctId) { toast('Please select an account'); return; }
   const dateCol = val('imp-col-date'), descCol = val('imp-col-desc'), amtCol = val('imp-col-amt'), sign = val('imp-sign');
   if (!dateCol || !descCol || !amtCol) { toast('Please map all columns'); return; }
   const fingerprints = new Set(transactions.map(t => t.fp).filter(Boolean));
   _pendingImport = []; let skipped = 0;
   _csvRows.forEach(row => {
-    const rawDate = row[dateCol] || '', rawAmt = row[amtCol] || '0', desc = row[descCol] || 'Purchase';
+    const rawDate = row[dateCol]||'', rawAmt = row[amtCol]||'0', desc = (row[descCol]||'Purchase').trim();
     let dateStr = today();
-    const d = new Date(rawDate);
-    if (!isNaN(d)) dateStr = d.toISOString().slice(0,10);
-    let amt = parseFloat(rawAmt.replace(/[$,\s]/g,'')) || 0;
-    amt = Math.abs(amt);
+    const d = new Date(rawDate); if (!isNaN(d)) dateStr = d.toISOString().slice(0,10);
+    const amt = Math.abs(parseFloat(rawAmt.replace(/[$,\s]/g,''))||0);
     if (amt <= 0) return;
-    const fp = btoa(unescape(encodeURIComponent(`${dateStr}|${desc}|${amt.toFixed(2)}`))).slice(0, 20);
+    const fp = btoa(unescape(encodeURIComponent(`${dateStr}|${desc}|${amt.toFixed(2)}`))).slice(0,20);
     if (fingerprints.has(fp)) { skipped++; return; }
     _pendingImport.push({ dateStr, desc, amt, fp, acctId, ownerId: accounts.find(a=>a.id===acctId)?.ownerId||'all' });
   });
-  el('imp-preview-summary').innerHTML = `<strong>${_pendingImport.length}</strong> new transactions to import.${skipped > 0 ? ` <span style="color:var(--muted)">${skipped} duplicates skipped.</span>` : ''}${_pendingImport.length === 0 ? '<br>All transactions already exist.' : ''}`;
-  el('imp-preview-table').innerHTML = buildPreviewTable(_pendingImport);
-  el('imp-step2').style.display = 'none';
-  el('imp-step3').style.display = 'block';
+  el('imp-acct-pick').style.display = 'none';
+  el('imp-back-remap').style.display = '';
+  showPreviewStep(_pendingImport.length + skipped, skipped);
 }
 
 function confirmImport() {
+  // For PDF flow, assign account now
+  const pdfAcct = val('imp-account-pdf');
+  if (el('imp-acct-pick').style.display !== 'none') {
+    if (!pdfAcct) { toast('Please select which account this is from'); return; }
+    _pendingImport.forEach(t => { t.acctId = pdfAcct; t.ownerId = accounts.find(a=>a.id===pdfAcct)?.ownerId||'all'; });
+  }
   if (!_pendingImport.length) { closeModal('m-import'); return; }
-  _pendingImport.forEach(t => {
+  // Dedup one more time before committing
+  const fingerprints = new Set(transactions.map(t => t.fp).filter(Boolean));
+  const toAdd = _pendingImport.filter(t => !fingerprints.has(t.fp));
+  toAdd.forEach(t => {
     transactions.push({ id:uid(), accountId:t.acctId, categoryId:'', note:t.desc, amount:t.amt, date:t.dateStr, ownerId:t.ownerId, fp:t.fp });
     const acct = accounts.find(a=>a.id===t.acctId);
     if (acct) acct.balance = (acct.balance||0) - t.amt;
   });
-  const count = _pendingImport.length;
+  const count = toAdd.length;
   persist(); _pendingImport = []; resetImport(); closeModal('m-import');
-  toast(`${count} transactions imported ✓`);
-  if (curPage === 'spend') renderSpend();
-  else if (curPage === 'budget') renderBudget();
+  toast(`${count} transaction${count!==1?'s':''} imported ✓`);
+  if (curPage==='spend') renderSpend();
+  else if (curPage==='budget') renderBudget();
 }
 
 function backToMapping() {
@@ -1652,8 +1740,9 @@ function resetImport() {
   el('imp-step1').style.display = 'block';
   el('imp-step2').style.display = 'none';
   el('imp-step3').style.display = 'none';
-  el('imp-dropzone').style.display = 'block';
-  el('imp-loading').style.display = 'none';
+  if(el('imp-dropzone')) el('imp-dropzone').style.display = 'block';
+  if(el('imp-loading')) el('imp-loading').style.display = 'none';
+  if(el('imp-acct-pick')) el('imp-acct-pick').style.display = 'none';
   const fi = el('imp-file'); if (fi) fi.value = '';
 }
 
@@ -1674,7 +1763,7 @@ function init() {
 }
 
 // Refresh selects when modals open
-['m-person','m-account','m-income','m-cat','m-bill','m-savings','m-import'].forEach(id => {
+['m-person','m-account','m-income','m-cat','m-bill','m-savings','m-import','m-edit-account'].forEach(id => {
   const overlay = el(id);
   if (overlay) {
     const observer = new MutationObserver(mutations => {
