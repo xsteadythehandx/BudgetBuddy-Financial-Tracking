@@ -1516,11 +1516,11 @@ async function processPDFFile(file) {
   if (!window.pdfjsLib) { toast('PDF library not loaded — check your connection'); return; }
   el('imp-dropzone').style.display = 'none';
   el('imp-loading').style.display = 'block';
-  // Use inline fake worker — works in all browsers, no CDN dependency for worker
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `data:application/javascript,`;
   try {
     const buf = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buf), disableWorker: true });
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000));
+    const pdf = await Promise.race([loadingTask.promise, timeoutPromise]);
     let fullText = '';
     for (let p = 1; p <= pdf.numPages; p++) {
       el('imp-loading-sub').textContent = `Reading page ${p} of ${pdf.numPages}...`;
@@ -1559,7 +1559,10 @@ async function processPDFFile(file) {
     el('imp-loading').style.display = 'none';
     el('imp-dropzone').style.display = 'block';
     console.error('PDF error:', err);
-    toast('Could not read this PDF — try downloading as CSV from your bank instead.');
+    const msg = err.message === 'timeout'
+      ? 'PDF took too long to read. Try a smaller file or download as CSV instead.'
+      : 'Could not read this PDF. It may be a scanned image — download as CSV from your bank instead.';
+    toast(msg);
   }
 }
 
