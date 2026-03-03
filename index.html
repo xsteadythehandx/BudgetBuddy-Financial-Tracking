@@ -964,38 +964,49 @@ function addMonths(d, m) { const r = new Date(d); r.setMonth(r.getMonth() + m); 
 //  DISCRETIONARY CALC
 // ════════════════════════════════
 function calcDiscretionary() {
-  const myIncome = filteredFor(income, 'ownerId');
-  const myBills  = filteredFor(bills, 'ownerId');
-  const myDebts  = filteredFor(accounts, 'ownerId').filter(a => a.type === 'credit' || a.type === 'loan');
-  const myCats   = filteredFor(categories, 'ownerId');
-  const mySavings = filteredFor(savings, 'ownerId');
+  const myIncome   = filteredFor(income, 'ownerId');
+  const myBills    = filteredFor(bills, 'ownerId');
+  const myDebts    = filteredFor(accounts, 'ownerId').filter(a => a.type === 'credit' || a.type === 'loan');
+  const myCats     = filteredFor(categories, 'ownerId');
+  const mySavings  = filteredFor(savings, 'ownerId');
+  const myTxns     = filteredFor(transactions, 'ownerId');
 
-  // Total monthly income
+  // Fixed monthly outflows
   const FREQ = {weekly: 4.33, biweekly: 2.17, semimonthly: 2, monthly: 1};
-  const monthlyIncome = myIncome.reduce((s, i) => s + (i.amount * (FREQ[i.freq] || 2.17)), 0);
-
-  // Fixed outflows per month
-  const monthlyBills = myBills.reduce((s, b) => s + b.amount, 0);
+  const monthlyBills    = myBills.reduce((s, b) => s + b.amount, 0);
   const monthlyDebtMins = myDebts.reduce((s, d) => s + Math.max(d.minPayment || 0, d.balance * 0.02), 0);
   const monthlyBudgeted = myCats.reduce((s, c) => s + c.budget, 0);
-  const monthlySavings = mySavings.reduce((s, g) => s + (g.monthly || 0), 0);
+  const monthlySavings  = mySavings.reduce((s, g) => s + (g.monthly || 0), 0);
+  const monthlyFixed    = monthlyBills + monthlyDebtMins + monthlyBudgeted + monthlySavings;
 
-  // This paycheck's share
-  // Find soonest pay
-  const nextIncome = myIncome[0];
-  const perCheck = nextIncome ? nextIncome.amount : monthlyIncome / 2;
+  // ── Try to use a real flagged paycheck transaction ──
+  const paychecks = myTxns.filter(t => t.isPaycheck).sort((a, b) => b.date.localeCompare(a.date));
+  const lastPaycheck = paychecks[0];
 
-  // Bills that hit this paycheck (rough: half of monthly)
-  const checkBills = (monthlyBills + monthlyDebtMins + monthlyBudgeted + monthlySavings) / (FREQ[nextIncome?.freq] || 2.17);
-  const discretionary = perCheck - checkBills;
+  if (lastPaycheck) {
+    // Spend since that paycheck date (excluding other paychecks)
+    const spentSincePay = myTxns
+      .filter(t => t.date >= lastPaycheck.date && !t.isPaycheck)
+      .reduce((s, t) => s + t.amount, 0);
+    const checkIncome = lastPaycheck.amount;
+    const checksPerMonth = myIncome[0] ? (FREQ[myIncome[0].freq] || 2.17) : 2.17;
+    const fixedPerCheck = monthlyFixed / checksPerMonth;
+    const discretionary = checkIncome - fixedPerCheck - spentSincePay;
+    const monthlyIncome = checkIncome * checksPerMonth;
+    return { discretionary, monthlyIncome, perCheck: checkIncome, spentSincePay, lastPaycheck, mode: 'real' };
+  }
 
-  // How much spent from discretionary categories THIS month
+  // ── Fallback: estimate from income setup ──
+  const monthlyIncome = myIncome.reduce((s, i) => s + (i.amount * (FREQ[i.freq] || 2.17)), 0);
+  const nextIncome    = myIncome[0];
+  const perCheck      = nextIncome ? nextIncome.amount : monthlyIncome / 2;
+  const checksPerMonth = FREQ[nextIncome?.freq] || 2.17;
+  const fixedPerCheck = monthlyFixed / checksPerMonth;
   const now = new Date();
   const moStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
-  const myTxns = filteredFor(transactions, 'ownerId');
-  const spentThisMo = myTxns.filter(t => t.date >= moStart).reduce((s, t) => s + t.amount, 0);
-
-  return { discretionary: Math.max(0, discretionary - spentThisMo), monthlyIncome, perCheck, spentThisMo };
+  const spentThisMo = myTxns.filter(t => t.date >= moStart && !t.isPaycheck).reduce((s, t) => s + t.amount, 0);
+  const discretionary = perCheck - fixedPerCheck - spentThisMo;
+  return { discretionary, monthlyIncome, perCheck, spentSincePay: spentThisMo, lastPaycheck: null, mode: 'estimate' };
 }
 
 // ════════════════════════════════
@@ -1003,32 +1014,40 @@ function calcDiscretionary() {
 // ════════════════════════════════
 function renderSpend() {
   refreshQSDropdowns();
-  const { discretionary, perCheck, spentThisMo } = calcDiscretionary();
-  const hasIncome = filteredFor(income, 'ownerId').length > 0;
+  const { discretionary, perCheck, spentSincePay, lastPaycheck, mode } = calcDiscretionary();
+  const hasIncome = filteredFor(income, 'ownerId').length > 0 || lastPaycheck;
 
-  el('disc-amount').textContent = hasIncome ? fmt(discretionary, 0) : '—';
-  el('disc-sub').textContent = hasIncome
-    ? `${fmt(spentThisMo,0)} spent so far · ${fmt(perCheck,0)} paycheck`
-    : 'Add your income in Setup to see this';
+  el('disc-amount').textContent = hasIncome ? fmt(Math.max(0, discretionary), 0) : '—';
+  if (lastPaycheck) {
+    el('disc-sub').textContent = `${fmt(spentSincePay, 0)} spent since ${lastPaycheck.date} · ${fmt(perCheck, 0)} paycheck`;
+  } else if (hasIncome) {
+    el('disc-sub').textContent = `${fmt(spentSincePay, 0)} spent · ${fmt(perCheck, 0)} est. paycheck · tap 💰 on a deposit to get exact tracking`;
+  } else {
+    el('disc-sub').textContent = 'Add income in Setup, or flag a paycheck deposit below';
+  }
 
   // Recent transactions
   const myTxns = filteredFor(transactions, 'ownerId');
-  const recent = [...myTxns].sort((a,b) => b.date.localeCompare(a.date)).slice(0, 12);
+  const recent = [...myTxns].sort((a,b) => b.date.localeCompare(a.date)).slice(0, 20);
   const list = el('recent-tx');
   if (!recent.length) {
-    list.innerHTML = `<div class="empty"><div class="empty-icon">&#128203;</div><div class="empty-title">No purchases yet</div><div class="empty-sub">Use the form above to log your first one.</div></div>`;
+    list.innerHTML = `<div class="empty"><div class="empty-icon">&#128203;</div><div class="empty-title">No transactions yet</div><div class="empty-sub">Log a purchase above, or import a bank statement in Setup.</div></div>`;
     return;
   }
   list.innerHTML = recent.map(t => {
     const acct = accounts.find(a => a.id === t.accountId);
     const cat  = categories.find(c => c.id === t.categoryId);
-    return `<div class="tx-row">
-      <div class="tx-icon" style="background:var(--primary-lt);color:var(--primary)">${catIcon(cat?.type || 'other')}</div>
-      <div class="tx-info">
-        <div class="tx-name">${t.note || cat?.name || 'Purchase'}</div>
-        <div class="tx-meta">${t.date}${acct ? ' &middot; '+acct.name : ''}${cat ? ' &middot; '+cat.name : ''}</div>
+    const isPC = t.isPaycheck;
+    return `<div class="tx-row" style="${isPC ? 'background:var(--primary-lt);border-radius:12px' : ''}">
+      <div class="tx-icon" style="background:${isPC ? 'var(--primary)' : 'var(--primary-lt)'};color:${isPC ? '#fff' : 'var(--primary)'}">
+        ${isPC ? '&#128176;' : catIcon(cat?.type || 'other')}
       </div>
-      <div class="tx-amt neg">&minus;${fmt(t.amount)}</div>
+      <div class="tx-info">
+        <div class="tx-name">${t.note || cat?.name || 'Purchase'}${isPC ? ' <span style="font-size:11px;background:var(--primary);color:#fff;padding:2px 7px;border-radius:10px;font-weight:700;vertical-align:middle">PAYCHECK</span>' : ''}</div>
+        <div class="tx-meta">${t.date}${acct ? ' &middot; '+acct.name : ''}${cat && !isPC ? ' &middot; '+cat.name : ''}</div>
+      </div>
+      <div class="tx-amt ${isPC ? 'pos' : 'neg'}">${isPC ? '+' : '&minus;'}${fmt(t.amount)}</div>
+      <button class="tx-del" title="${isPC ? 'Unmark paycheck' : 'Mark as my paycheck'}" onclick="togglePaycheck('${t.id}')" style="color:${isPC ? 'var(--primary)' : 'var(--dim)'};font-size:${isPC ? '18px' : '16px'}">&#128176;</button>
       <button class="tx-del" onclick="deleteTxn('${t.id}')" title="Delete">&times;</button>
     </div>`;
   }).join('');
@@ -1057,6 +1076,20 @@ function logSpend() {
   el('qs-note').value   = '';
   toast('Logged ✓');
   renderSpend();
+}
+
+function togglePaycheck(id) {
+  const t = transactions.find(x => x.id === id); if (!t) return;
+  if (t.isPaycheck) {
+    // Unmark — restore as a normal expense deduction
+    t.isPaycheck = false;
+    toast('Unmarked as paycheck');
+  } else {
+    // Mark as paycheck — reverse any balance deduction (it's income, not spending)
+    t.isPaycheck = true;
+    toast('&#128176; Marked as your paycheck — discretionary updated');
+  }
+  persist(); renderSpend();
 }
 
 function deleteTxn(id) {
